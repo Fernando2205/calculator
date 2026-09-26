@@ -68,6 +68,14 @@ describe('calculate', () => {
 
     expect(error).toMatchObject({ code: 'INVALID_RESPONSE', message: 'unexpected response from api' })
   })
+
+  it('rejects with a generic error when an error response has no error body', async () => {
+    mockFetch(async () => jsonResponse({ message: 'nope' }, 500))
+
+    const error = await calculate('add', 1, 2).catch((e: unknown) => e)
+
+    expect(error).toMatchObject({ code: 'INVALID_RESPONSE', message: 'unexpected response from api' })
+  })
 })
 
 describe('checkHealth', () => {
