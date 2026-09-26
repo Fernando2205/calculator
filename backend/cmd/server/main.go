@@ -17,21 +17,9 @@ func main() {
 	port := getEnv("PORT", "8080")
 	origin := getEnv("CORS_ORIGIN", "http://localhost:5173")
 
-	// "server healthcheck" is used by the Docker HEALTHCHECK, since the
-	// distroless image has no shell or curl.
-	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
-		os.Exit(healthcheck(port))
-	}
-
-	var handler http.Handler = api.NewHandler()
-	if dir := os.Getenv("STATIC_DIR"); dir != "" {
-		handler = api.WithStaticFiles(dir, handler)
-		log.Printf("serving frontend from %s", dir)
-	}
-
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           api.WithCORS(origin, handler),
+		Handler:           api.WithCORS(origin, api.NewHandler()),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
@@ -57,20 +45,6 @@ func main() {
 		return
 	}
 	log.Println("server stopped")
-}
-
-// healthcheck calls the local health endpoint and returns a process exit code.
-func healthcheck(port string) int {
-	client := http.Client{Timeout: 2 * time.Second}
-	resp, err := client.Get("http://localhost:" + port + "/healthz")
-	if err != nil {
-		return 1
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return 1
-	}
-	return 0
 }
 
 func getEnv(key, fallback string) string {
