@@ -2,9 +2,24 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/Fernando2205/calculator/backend/internal/calculator"
+)
+
+// maxBodyBytes limits the request body size. Two numbers never need more than this.
+const maxBodyBytes = 1 << 10 // 1 KB
+
+// Error codes returned in the "code" field of error responses.
+const (
+	codeInvalidJSON       = "INVALID_JSON"
+	codeMissingOperand    = "MISSING_OPERAND"
+	codeUnexpectedOperand = "UNEXPECTED_OPERAND"
+	codeUnknownOperation  = "UNKNOWN_OPERATION"
+	codePayloadTooLarge   = "PAYLOAD_TOO_LARGE"
 )
 
 type calculationRequest struct {
@@ -22,6 +37,15 @@ type calculationResponse struct {
 type operation struct {
 	unary bool
 	apply func(a, b float64) (float64, error)
+}
+
+type errorResponse struct {
+	Error errorBody `json:"error"`
+}
+
+type errorBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
 }
 
 var operations = map[string]operation{
@@ -45,10 +69,38 @@ func NewHandler() http.Handler {
 
 func handleCalculate(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("operation")
-	op := operations[name]
+	op, ok := operations[name]
+	if !ok {
+		writeError(w, http.StatusNotFound, codeUnknownOperation, fmt.Sprintf("unknown operation %q", name))
+		return
+	}
 
-	var req calculationRequest
-	json.NewDecoder(r.Body).Decode(&req)
+	req, err := decodeRequest(w, r)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeError(w, http.StatusRequestEntityTooLarge, codePayloadTooLarge,
+				fmt.Sprintf("request body must not exceed %d bytes", maxBodyBytes))
+			return
+		}
+		writeError(w, http.StatusBadRequest, codeInvalidJSON,
+			`request body must be a JSON object like {"a": 1, "b": 2}`)
+		return
+	}
+
+	if req.A == nil || (!op.unary && req.B == nil) {
+		msg := `operands "a" and "b" are required`
+		if op.unary {
+			msg = `operand "a" is required`
+		}
+		writeError(w, http.StatusBadRequest, codeMissingOperand, msg)
+		return
+	}
+	if op.unary && req.B != nil {
+		writeError(w, http.StatusBadRequest, codeUnexpectedOperand,
+			fmt.Sprintf(`operation %q only accepts operand "a"`, name))
+		return
+	}
 
 	var b float64
 	if !op.unary {
@@ -63,4 +115,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(v)
+}
+
+// decodeRequest parses the body as a single JSON object, rejecting unknown
+// fields, trailing data and bodies larger than maxBodyBytes.
+func decodeRequest(w http.ResponseWriter, r *http.Request) (calculationRequest, error) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	var req calculationRequest
+	if err := dec.Decode(&req); err != nil {
+		return req, err
+	}
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		return req, errors.New("request body must contain a single JSON object")
+	}
+	return req, nil
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeJSON(w, status, errorResponse{Error: errorBody{Code: code, Message: message}})
 }
