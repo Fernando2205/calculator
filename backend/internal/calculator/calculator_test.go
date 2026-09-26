@@ -98,7 +98,7 @@ func TestDivide(t *testing.T) {
 		{"two negative numbers", -6, -3, 2, nil},
 		{"one positive and one negative number", 6, -3, -2, nil},
 		{"zero divided by a number", 0, 5, 0, nil},
-		{"non integer result", 1, 3, 0.33, nil},
+		{"non integer result", 1, 3, 0.33333333333, nil},
 		{"positive number divided by zero", 5, 0, 0, ErrDivisionByZero},
 		{"negative number divided by zero", -5, 0, 0, ErrDivisionByZero},
 		{"zero divided by zero", 0, 0, 0, ErrDivisionByZero},
