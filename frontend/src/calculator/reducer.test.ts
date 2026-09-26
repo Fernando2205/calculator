@@ -146,12 +146,60 @@ describe('setOperator', () => {
     const start = state({ error: 'division by zero', fresh: true })
     expect(run(start, { type: 'setOperator', op: 'add' })).toEqual(start)
   })
+
+  it('is ignored while a square root is pending', () => {
+    const start = state({ a: '', sqrt: true })
+    expect(run(start, { type: 'setOperator', op: 'add' })).toEqual(start)
+  })
+})
+
+describe('sqrt', () => {
+  it('starts a new operand under √ instead of using the initial zero', () => {
+    expect(run(initialState, { type: 'sqrt' })).toMatchObject({ a: '', sqrt: true })
+  })
+
+  it('lets the user type the number after √', () => {
+    expect(run(initialState, { type: 'sqrt' }, ...digits('16'))).toMatchObject({ a: '16', sqrt: true })
+  })
+
+  it('applies to "b" when an operator is pending', () => {
+    const next = run(state({ a: '5', op: 'add' }), { type: 'sqrt' }, ...digits('9'))
+    expect(next).toMatchObject({ a: '5', op: 'add', b: '9', sqrt: true })
+  })
+
+  it('marks a number that was already typed', () => {
+    expect(run(state({ a: '9' }), { type: 'sqrt' })).toMatchObject({ a: '9', sqrt: true })
+  })
+
+  it('starts over after a result', () => {
+    const next = run(state({ a: '9', result: '9', expr: '7 + 2', fresh: true }), { type: 'sqrt' })
+    expect(next).toMatchObject({ a: '', sqrt: true, result: null, expr: '', fresh: false })
+  })
+
+  it('starts over after an error', () => {
+    const next = run(state({ error: 'division by zero', expr: '5 ÷ 0', fresh: true }), { type: 'sqrt' })
+    expect(next).toMatchObject({ a: '', sqrt: true, error: null, expr: '' })
+  })
+
+  it('is removed by backspace when the operand is empty', () => {
+    expect(run(initialState, { type: 'sqrt' }, { type: 'back' })).toMatchObject({ a: '0', sqrt: false })
+    expect(run(state({ a: '5', op: 'add' }), { type: 'sqrt' }, { type: 'back' }))
+      .toMatchObject({ op: 'add', b: '', sqrt: false })
+  })
+
+  it('keeps √ when backspace empties the typed number', () => {
+    expect(run(state({ a: '7', sqrt: true }), { type: 'back' })).toMatchObject({ a: '', sqrt: true })
+  })
+
+  it('is reset by clear', () => {
+    expect(run(state({ a: '9', sqrt: true }), { type: 'clear' }).sqrt).toBe(false)
+  })
 })
 
 describe('reuse', () => {
   it('loads a history result as the current operand', () => {
-    const next = run(state({ a: '5', op: 'add', b: '1', error: 'x' }), { type: 'reuse', value: '42' })
-    expect(next).toMatchObject({ a: '42', op: null, b: '', result: null, error: null, fresh: false })
+    const next = run(state({ a: '5', op: 'add', b: '1', error: 'x', sqrt: true }), { type: 'reuse', value: '42' })
+    expect(next).toMatchObject({ a: '42', op: null, b: '', result: null, error: null, fresh: false, sqrt: false })
   })
 })
 
@@ -165,6 +213,7 @@ describe('while loading', () => {
     { type: 'back' },
     { type: 'clear' },
     { type: 'setOperator', op: 'divide' },
+    { type: 'sqrt' },
     { type: 'reuse', value: '42' }
   ])('ignores $type', (action) => {
     expect(calculatorReducer(loading, action)).toBe(loading)
@@ -192,11 +241,20 @@ describe('request lifecycle', () => {
   it('replaces "b" without showing a result when the target is "b"', () => {
     const sqrt = { operation: 'sqrt' as const, a: 16, expr: '√(16)', target: 'b' as const }
     const next = run(
-      state({ a: '5', op: 'add', b: '16', loading: true }),
+      state({ a: '5', op: 'add', b: '16', sqrt: true, loading: true }),
       { type: 'requestSucceeded', request: sqrt, result: '4' }
     )
-    expect(next).toMatchObject({ a: '5', op: 'add', b: '4', result: null, loading: false })
+    expect(next).toMatchObject({ a: '5', op: 'add', b: '4', result: null, sqrt: false, loading: false })
     expect(next.history).toEqual([{ expr: '√(16)', result: '4' }])
+  })
+
+  it('resolves a pending square root on "a"', () => {
+    const sqrt = { operation: 'sqrt' as const, a: 16, expr: '√(16)', target: 'a' as const }
+    const next = run(
+      state({ a: '16', sqrt: true, loading: true }),
+      { type: 'requestSucceeded', request: sqrt, result: '4' }
+    )
+    expect(next).toMatchObject({ a: '4', result: '4', expr: '√(16)', sqrt: false, fresh: true })
   })
 
   it('adds entries to the end of the history', () => {
@@ -211,7 +269,7 @@ describe('request lifecycle', () => {
       { type: 'requestFailed', request: { ...request, expr: '5 ÷ 0' }, message: 'division by zero' }
     )
     expect(next).toMatchObject({
-      error: 'division by zero', expr: '5 ÷ 0', op: null, b: '', fresh: true, loading: false
+      error: 'division by zero', expr: '5 ÷ 0', op: null, b: '', sqrt: false, fresh: true, loading: false
     })
     expect(next.history).toEqual([])
   })
@@ -242,7 +300,8 @@ describe('equalsRequest', () => {
     ['there is no operator', state({ a: '7' })],
     ['"b" is empty', state({ a: '7', op: 'add' })],
     ['"b" is only a minus sign', state({ a: '7', op: 'add', b: '-' })],
-    ['a request is in flight', state({ a: '7', op: 'add', b: '2', loading: true })]
+    ['a request is in flight', state({ a: '7', op: 'add', b: '2', loading: true })],
+    ['"b" still has a pending square root', state({ a: '7', op: 'add', b: '9', sqrt: true })]
   ])('returns null when %s', (_, s) => {
     expect(equalsRequest(s)).toBeNull()
   })
@@ -250,21 +309,22 @@ describe('equalsRequest', () => {
 
 describe('sqrtRequest', () => {
   it('targets "a" when there is no pending operator', () => {
-    expect(sqrtRequest(state({ a: '16' }))).toEqual({
+    expect(sqrtRequest(state({ a: '16', sqrt: true }))).toEqual({
       operation: 'sqrt', a: 16, expr: '√(16)', target: 'a'
     })
   })
 
   it('targets "b" when an operator is pending', () => {
-    expect(sqrtRequest(state({ a: '5', op: 'add', b: '9' }))).toEqual({
+    expect(sqrtRequest(state({ a: '5', op: 'add', b: '9', sqrt: true }))).toEqual({
       operation: 'sqrt', a: 9, expr: '√(9)', target: 'b'
     })
   })
 
   it.each([
-    ['the operand is empty', state({ a: '5', op: 'add' })],
-    ['there is an error', state({ error: 'x' })],
-    ['a request is in flight', state({ a: '16', loading: true })]
+    ['there is no pending square root', state({ a: '16' })],
+    ['the number after √ is empty', state({ a: '', sqrt: true })],
+    ['the number after √ is only a minus sign', state({ a: '5', op: 'add', b: '-', sqrt: true })],
+    ['a request is in flight', state({ a: '16', sqrt: true, loading: true })]
   ])('returns null when %s', (_, s) => {
     expect(sqrtRequest(s)).toBeNull()
   })

@@ -30,6 +30,18 @@ describe('getDisplay', () => {
     })
   })
 
+  it('shows a pending square root before its number', () => {
+    expect(getDisplay(state({ a: '', sqrt: true })).value).toBe('√')
+    expect(getDisplay(state({ a: '16', sqrt: true })).value).toBe('√16')
+  })
+
+  it('shows a pending square root on "b" after the operator', () => {
+    expect(getDisplay(state({ a: '5', op: 'add', b: '9', sqrt: true }))).toMatchObject({
+      expression: '5 +',
+      value: '√9'
+    })
+  })
+
   it('shows the result with its expression and an ok status', () => {
     expect(getDisplay(state({ a: '9', result: '9', expr: '7 + 2', fresh: true }))).toEqual({
       expression: '7 + 2 =',

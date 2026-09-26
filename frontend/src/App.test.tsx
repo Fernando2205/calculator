@@ -104,13 +104,36 @@ describe('App', () => {
     expect(calculationCalls()).toHaveLength(2)
   })
 
-  it('computes a square root', async () => {
+  it('computes a square root typed after the √ key', async () => {
     render(<App />)
 
-    await press('1', '6', 'square root')
+    await press('square root')
+    expect(display()).toHaveTextContent('√')
+    await press('1', '6')
+    expect(display()).toHaveTextContent('√16')
+    expect(calculationCalls()).toHaveLength(0)
+    await press('equals')
 
     await waitFor(() => expect(display()).toHaveTextContent('4'))
     expect(screen.getByText('√(16) =')).toBeInTheDocument()
+  })
+
+  it('computes a square root with the keyboard', async () => {
+    render(<App />)
+
+    await userEvent.keyboard('s81{Enter}')
+
+    await waitFor(() => expect(display()).toHaveTextContent('9'))
+  })
+
+  it('resolves a pending square root before applying the next operator', async () => {
+    render(<App />)
+
+    await press('square root', '9', 'add')
+    await waitFor(() => expect(screen.getByText('3 +')).toBeInTheDocument())
+    await press('1', 'equals')
+
+    await waitFor(() => expect(display()).toHaveTextContent('4'))
   })
 
   it('formats results that have floating point noise', async () => {
@@ -182,7 +205,7 @@ describe('App', () => {
   it('does not call the API when the calculation is incomplete', async () => {
     render(<App />)
 
-    await press('equals', '7', 'add', 'equals', 'toggle sign', 'square root')
+    await press('equals', '7', 'add', 'equals', 'toggle sign', 'square root', 'equals')
 
     expect(calculationCalls()).toHaveLength(0)
   })
@@ -199,12 +222,25 @@ describe('App', () => {
   it('applies the square root to the second operand', async () => {
     render(<App />)
 
-    await press('5', 'add', '9', 'square root')
-    await waitFor(() => expect(display()).toHaveTextContent('3'))
+    await press('5', 'add', 'square root', '9')
+    expect(screen.getByText('5 +')).toBeInTheDocument()
+    expect(display()).toHaveTextContent('√9')
     await press('equals')
 
     await waitFor(() => expect(display()).toHaveTextContent('8'))
     expect(screen.getByText('5 + 3 =')).toBeInTheDocument()
+    expect(calculationCalls()).toHaveLength(2)
+  })
+
+  it('shows the API error for the square root of a negative number', async () => {
+    serve(async (url, body) => url.endsWith('/sqrt') && body.a < 0
+      ? json({ error: { code: 'NEGATIVE_SQRT', message: 'square root of negative number' } }, 422)
+      : fakeBackend(url, body))
+    render(<App />)
+
+    await press('square root', '4', 'toggle sign', 'equals')
+
+    expect(await screen.findByText('✕ square root of negative number')).toBeInTheDocument()
   })
 
   it('ignores history clicks while a calculation is in flight', async () => {
