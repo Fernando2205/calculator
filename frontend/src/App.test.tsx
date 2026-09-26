@@ -85,6 +85,14 @@ describe('App', () => {
     await waitFor(() => expect(display()).toHaveTextContent('36'))
   })
 
+  it('accepts characters typed with AltGr, which Windows reports as Ctrl + Alt', async () => {
+    render(<App />)
+
+    await userEvent.keyboard('2{Control>}{Alt>}^{/Alt}{/Control}3{Enter}')
+
+    await waitFor(() => expect(display()).toHaveTextContent('8'))
+  })
+
   it('ignores keys pressed with Ctrl or Meta', async () => {
     render(<App />)
 
