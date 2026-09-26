@@ -20,6 +20,10 @@ const (
 	codeUnexpectedOperand = "UNEXPECTED_OPERAND"
 	codeUnknownOperation  = "UNKNOWN_OPERATION"
 	codePayloadTooLarge   = "PAYLOAD_TOO_LARGE"
+	codeDivisionByZero    = "DIVISION_BY_ZERO"
+	codeNegativeSqrt      = "NEGATIVE_SQRT"
+	codeNonFiniteResult   = "NON_FINITE_RESULT"
+	codeInternal          = "INTERNAL_ERROR"
 )
 
 type calculationRequest struct {
@@ -106,7 +110,16 @@ func handleCalculate(w http.ResponseWriter, r *http.Request) {
 	if !op.unary {
 		b = *req.B
 	}
-	result, _ := op.apply(*req.A, b)
+	result, err := op.apply(*req.A, b)
+	if err != nil {
+		code, ok := domainErrorCode(err)
+		if !ok {
+			writeError(w, http.StatusInternalServerError, codeInternal, "internal server error")
+			return
+		}
+		writeError(w, http.StatusUnprocessableEntity, code, err.Error())
+		return
+	}
 
 	writeJSON(w, http.StatusOK, calculationResponse{Operation: name, Result: result})
 }
@@ -132,6 +145,21 @@ func decodeRequest(w http.ResponseWriter, r *http.Request) (calculationRequest, 
 		return req, errors.New("request body must contain a single JSON object")
 	}
 	return req, nil
+}
+
+// domainErrorCode maps a calculator error to its API error code.
+// It reports false for errors the API does not know about.
+func domainErrorCode(err error) (string, bool) {
+	switch {
+	case errors.Is(err, calculator.ErrDivisionByZero):
+		return codeDivisionByZero, true
+	case errors.Is(err, calculator.ErrNegativeSqrt):
+		return codeNegativeSqrt, true
+	case errors.Is(err, calculator.ErrNonFiniteResult):
+		return codeNonFiniteResult, true
+	default:
+		return "", false
+	}
 }
 
 func writeError(w http.ResponseWriter, status int, code, message string) {
