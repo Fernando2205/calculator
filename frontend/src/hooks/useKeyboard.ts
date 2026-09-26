@@ -16,8 +16,7 @@ export function useKeyboard (onKey: (key: KeyId) => void) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // AltGr is reported as Ctrl + Alt on Windows, so only plain Ctrl is ignored.
-      if (event.metaKey || (event.ctrlKey && !event.altKey)) return
+      if (event.ctrlKey || event.metaKey) return
       const key = keyFromKeyboard(event.key)
       if (!key) return
 
