@@ -171,6 +171,55 @@ describe('App', () => {
     expect(calculationCalls()).toHaveLength(1)
   })
 
+  it('ignores keys that are not shortcuts', async () => {
+    render(<App />)
+
+    await userEvent.keyboard('7a{ArrowLeft}')
+
+    expect(display()).toHaveTextContent('7')
+  })
+
+  it('does not call the API when the calculation is incomplete', async () => {
+    render(<App />)
+
+    await press('equals', '7', 'add', 'equals', 'toggle sign', 'square root')
+
+    expect(calculationCalls()).toHaveLength(0)
+  })
+
+  it('stops a chained operation when the pending one fails', async () => {
+    render(<App />)
+
+    await press('5', 'divide', '0', 'multiply')
+
+    await waitFor(() => expect(display()).toHaveTextContent('Error'))
+    expect(screen.getByRole('button', { name: 'multiply' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('applies the square root to the second operand', async () => {
+    render(<App />)
+
+    await press('5', 'add', '9', 'square root')
+    await waitFor(() => expect(display()).toHaveTextContent('3'))
+    await press('equals')
+
+    await waitFor(() => expect(display()).toHaveTextContent('8'))
+    expect(screen.getByText('5 + 3 =')).toBeInTheDocument()
+  })
+
+  it('ignores history clicks while a calculation is in flight', async () => {
+    render(<App />)
+    await press('7', 'add', '2', 'equals')
+    const row = await screen.findByRole('button', { name: /7 \+ 2/ })
+    serve(() => new Promise(() => {}))
+
+    await press('add', '1', 'equals')
+    await userEvent.click(row)
+
+    expect(screen.getByText('9 +')).toBeInTheDocument()
+    expect(display()).toHaveTextContent('1')
+  })
+
   it('lists the history newest first', async () => {
     render(<App />)
     await press('1', 'add', '1', 'equals')
