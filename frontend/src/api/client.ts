@@ -1,6 +1,9 @@
 export type BinaryOperation = 'add' | 'subtract' | 'multiply' | 'divide' | 'power' | 'percentage'
 export type Operation = BinaryOperation | 'sqrt'
 
+/** Connection state of the backend, as shown in the status pill. */
+export type ApiStatus = 'checking' | 'online' | 'offline'
+
 /** Client-side error code used when the API cannot be reached. */
 export const NETWORK_ERROR = 'NETWORK'
 
