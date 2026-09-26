@@ -13,6 +13,8 @@ describe('keyFromKeyboard', () => {
     ['x', 'multiply'],
     ['/', 'divide'],
     ['^', 'power'],
+    // "^" is a dead key on Spanish layouts, so "p" is an alternative shortcut.
+    ['p', 'power'],
     ['%', 'percentage'],
     ['s', 'sqrt'],
     ['Enter', 'equals'],
@@ -23,7 +25,7 @@ describe('keyFromKeyboard', () => {
     expect(keyFromKeyboard(key)).toBe(want)
   })
 
-  it.each(['a', 'Tab', 'ArrowLeft', 'F5', ' '])('ignores "%s"', (key) => {
+  it.each(['a', 'Tab', 'ArrowLeft', 'F5', ' ', 'Dead'])('ignores "%s"', (key) => {
     expect(keyFromKeyboard(key)).toBeNull()
   })
 })
