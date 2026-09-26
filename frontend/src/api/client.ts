@@ -53,7 +53,8 @@ export async function calculate (operation: Operation, a: number, b?: number): P
   }
 
   if (!response.ok) {
-    const { error } = data as ErrorBody
+    const { error } = data as Partial<ErrorBody>
+    if (!error) throw new ApiError(INVALID_RESPONSE, 'unexpected response from api')
     throw new ApiError(error.code, error.message)
   }
   return (data as SuccessBody).result
