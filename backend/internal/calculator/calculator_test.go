@@ -209,6 +209,30 @@ func TestPercentage(t *testing.T) {
 	}
 }
 
+func TestNonFiniteResults(t *testing.T) {
+	tests := []struct {
+		name string
+		op   func() (float64, error)
+	}{
+		{"add overflow", func() (float64, error) { return Add(math.MaxFloat64, math.MaxFloat64) }},
+		{"subtract overflow", func() (float64, error) { return Subtract(-math.MaxFloat64, math.MaxFloat64) }},
+		{"multiply overflow", func() (float64, error) { return Multiply(math.MaxFloat64, 2) }},
+		{"divide overflow", func() (float64, error) { return Divide(math.MaxFloat64, 0.5) }},
+		{"power overflow", func() (float64, error) { return Power(10, 400) }},
+		{"zero to a negative power", func() (float64, error) { return Power(0, -1) }},
+		{"negative base with fractional exponent", func() (float64, error) { return Power(-8, 1.0/3) }},
+		{"percentage overflow", func() (float64, error) { return Percentage(math.MaxFloat64, 200) }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.op()
+			if !errors.Is(err, ErrNonFiniteResult) {
+				t.Fatalf("got (%v, %v), want error %v", got, err, ErrNonFiniteResult)
+			}
+		})
+	}
+}
+
 const epsilon = 1e-9
 
 func almostEqual(a, b float64) bool {
