@@ -65,7 +65,12 @@
 }
 
 @layer base {
-  html,
+  /* The 14px base size goes on body, not html: Tailwind spacing is in rem,
+     so the root must stay at 16px for h-14 to be 56px as in the design. */
+  html {
+    @apply bg-bg;
+  }
+
   body {
     @apply bg-bg text-fg font-mono text-[14px];
   }
