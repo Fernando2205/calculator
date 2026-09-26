@@ -29,7 +29,7 @@ func TestCalculateSuccess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodPost, "api/v1/"+tt.operation, strings.NewReader(tt.body))
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/"+tt.operation, strings.NewReader(tt.body))
 			rec := httptest.NewRecorder()
 
 			handler.ServeHTTP(rec, req)
