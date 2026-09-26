@@ -1,0 +1,17 @@
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:68:			NewHandler	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:75:			handleHealth	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:79:			handleCalculate	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:132:			writeJSON	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:140:			decodeRequest	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:157:			domainErrorCode	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/handler.go:170:			writeError	100.0%
+github.com/Fernando2205/calculator/backend/internal/api/middleware.go:7:		WithCORS	100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:17:	Add		100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:21:	Subtract	100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:25:	Multiply	100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:29:	Divide		100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:36:	Power		100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:40:	Sqrt		100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:48:	Percentage	100.0%
+github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go:54:	finite		100.0%
+total:											(statements)	100.0%

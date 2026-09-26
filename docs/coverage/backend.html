@@ -1,0 +1,361 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>api: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/Fernando2205/calculator/backend/internal/api/handler.go (100.0%)</option>
+				
+				<option value="file1">github.com/Fernando2205/calculator/backend/internal/api/middleware.go (100.0%)</option>
+				
+				<option value="file2">github.com/Fernando2205/calculator/backend/internal/calculator/calculator.go (100.0%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package api
+
+import (
+        "encoding/json"
+        "errors"
+        "fmt"
+        "io"
+        "net/http"
+
+        "github.com/Fernando2205/calculator/backend/internal/calculator"
+)
+
+// maxBodyBytes limits the request body size. Two numbers never need more than this.
+const maxBodyBytes = 1 &lt;&lt; 10 // 1 KB
+
+// Error codes returned in the "code" field of error responses.
+const (
+        codeInvalidJSON       = "INVALID_JSON"
+        codeMissingOperand    = "MISSING_OPERAND"
+        codeUnexpectedOperand = "UNEXPECTED_OPERAND"
+        codeUnknownOperation  = "UNKNOWN_OPERATION"
+        codePayloadTooLarge   = "PAYLOAD_TOO_LARGE"
+        codeDivisionByZero    = "DIVISION_BY_ZERO"
+        codeNegativeSqrt      = "NEGATIVE_SQRT"
+        codeNonFiniteResult   = "NON_FINITE_RESULT"
+        codeInternal          = "INTERNAL_ERROR"
+)
+
+type calculationRequest struct {
+        A *float64 `json:"a"`
+        B *float64 `json:"b"`
+}
+
+type calculationResponse struct {
+        Operation string  `json:"operation"`
+        Result    float64 `json:"result"`
+}
+
+// operation adapts a calculator function to a common signature.
+// Unary operations ignore the second operand.
+type operation struct {
+        unary bool
+        apply func(a, b float64) (float64, error)
+}
+
+type errorResponse struct {
+        Error errorBody `json:"error"`
+}
+
+type errorBody struct {
+        Code    string `json:"code"`
+        Message string `json:"message"`
+}
+
+var operations = map[string]operation{
+        "add":        {apply: calculator.Add},
+        "subtract":   {apply: calculator.Subtract},
+        "multiply":   {apply: calculator.Multiply},
+        "divide":     {apply: calculator.Divide},
+        "power":      {apply: calculator.Power},
+        "percentage": {apply: calculator.Percentage},
+        "sqrt": {unary: true, apply: func(a, _ float64) (float64, error) {
+                <span class="cov8" title="1">return calculator.Sqrt(a)
+</span>        }},
+}
+
+// NewHandler returns the HTTP handler with all API routes registered.
+func NewHandler() http.Handler {
+        <span class="cov8" title="1">mux := http.NewServeMux()
+        mux.HandleFunc("POST /api/v1/{operation}", handleCalculate)
+        mux.HandleFunc("GET /healthz", handleHealth)
+        return mux
+</span>}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+        <span class="cov8" title="1">writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+</span>}
+
+func handleCalculate(w http.ResponseWriter, r *http.Request) {
+        <span class="cov8" title="1">name := r.PathValue("operation")
+        op, ok := operations[name]
+        if !ok </span>{
+                <span class="cov8" title="1">writeError(w, http.StatusNotFound, codeUnknownOperation, fmt.Sprintf("unknown operation %q", name))
+                return
+</span>        }
+
+        <span class="cov8" title="1">req, err := decodeRequest(w, r)
+        if err != nil </span>{
+                <span class="cov8" title="1">var maxErr *http.MaxBytesError
+                if errors.As(err, &amp;maxErr) </span>{
+                        <span class="cov8" title="1">writeError(w, http.StatusRequestEntityTooLarge, codePayloadTooLarge,
+                                fmt.Sprintf("request body must not exceed %d bytes", maxBodyBytes))
+                        return
+</span>                }
+                <span class="cov8" title="1">writeError(w, http.StatusBadRequest, codeInvalidJSON,
+                        `request body must be a JSON object like {"a": 1, "b": 2}`)
+                return</span>
+        }
+
+        <span class="cov8" title="1">if req.A == nil || (!op.unary &amp;&amp; req.B == nil) </span>{
+                <span class="cov8" title="1">msg := `operands "a" and "b" are required`
+                if op.unary </span>{
+                        <span class="cov8" title="1">msg = `operand "a" is required`
+</span>                }
+                <span class="cov8" title="1">writeError(w, http.StatusBadRequest, codeMissingOperand, msg)
+                return</span>
+        }
+        <span class="cov8" title="1">if op.unary &amp;&amp; req.B != nil </span>{
+                <span class="cov8" title="1">writeError(w, http.StatusBadRequest, codeUnexpectedOperand,
+                        fmt.Sprintf(`operation %q only accepts operand "a"`, name))
+                return
+</span>        }
+
+        <span class="cov8" title="1">var b float64
+        if !op.unary </span>{
+                <span class="cov8" title="1">b = *req.B
+</span>        }
+        <span class="cov8" title="1">result, err := op.apply(*req.A, b)
+        if err != nil </span>{
+                <span class="cov8" title="1">code, ok := domainErrorCode(err)
+                if !ok </span>{
+                        <span class="cov8" title="1">writeError(w, http.StatusInternalServerError, codeInternal, "internal server error")
+                        return
+</span>                }
+                <span class="cov8" title="1">writeError(w, http.StatusUnprocessableEntity, code, err.Error())
+                return</span>
+        }
+
+        <span class="cov8" title="1">writeJSON(w, http.StatusOK, calculationResponse{Operation: name, Result: result})</span>
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+        <span class="cov8" title="1">w.Header().Set("Content-Type", "application/json")
+        w.WriteHeader(status)
+        json.NewEncoder(w).Encode(v)
+</span>}
+
+// decodeRequest parses the body as a single JSON object, rejecting unknown
+// fields, trailing data and bodies larger than maxBodyBytes.
+func decodeRequest(w http.ResponseWriter, r *http.Request) (calculationRequest, error) {
+        <span class="cov8" title="1">r.Body = http.MaxBytesReader(w, r.Body, maxBodyBytes)
+        dec := json.NewDecoder(r.Body)
+        dec.DisallowUnknownFields()
+</span>
+        <span class="cov8" title="1">var req calculationRequest
+        if err := dec.Decode(&amp;req); err != nil </span>{
+                <span class="cov8" title="1">return req, err
+</span>        }
+        <span class="cov8" title="1">if err := dec.Decode(&amp;struct{}{}); err != io.EOF </span>{
+                <span class="cov8" title="1">return req, errors.New("request body must contain a single JSON object")
+</span>        }
+        <span class="cov8" title="1">return req, nil</span>
+}
+
+// domainErrorCode maps a calculator error to its API error code.
+// It reports false for errors the API does not know about.
+func domainErrorCode(err error) (string, bool) {
+        <span class="cov8" title="1">switch </span>{
+        case errors.Is(err, calculator.ErrDivisionByZero):
+                <span class="cov8" title="1">return codeDivisionByZero, true</span>
+        case errors.Is(err, calculator.ErrNegativeSqrt):
+                <span class="cov8" title="1">return codeNegativeSqrt, true</span>
+        case errors.Is(err, calculator.ErrNonFiniteResult):
+                <span class="cov8" title="1">return codeNonFiniteResult, true</span>
+        default:
+                <span class="cov8" title="1">return "", false</span>
+        }
+}
+
+func writeError(w http.ResponseWriter, status int, code, message string) {
+        <span class="cov8" title="1">writeJSON(w, status, errorResponse{Error: errorBody{Code: code, Message: message}})
+</span>}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package api
+
+import "net/http"
+
+// WithCORS allows browsers served from allowedOrigin to call next.
+// Preflight (OPTIONS) requests are answered directly with 204 No Content.
+func WithCORS(allowedOrigin string, next http.Handler) http.Handler {
+        <span class="cov8" title="1">return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span>{
+                <span class="cov8" title="1">w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
+                w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+</span>
+                <span class="cov8" title="1">if r.Method == http.MethodOptions </span>{
+                        <span class="cov8" title="1">w.WriteHeader(http.StatusNoContent)
+                        return
+</span>                }
+                <span class="cov8" title="1">next.ServeHTTP(w, r)</span>
+        })
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package calculator
+
+import (
+        "errors"
+        "math"
+)
+
+// ErrDivisionByZero is returned when the divisor is zero.
+var ErrDivisionByZero = errors.New("division by zero")
+
+// ErrNegativeSqrt is returned when attempting to calculate the square root of a negative number.
+var ErrNegativeSqrt = errors.New("square root of negative number")
+
+// ErrNonFiniteResult is returned when an operation overflows or its result is undefined.
+var ErrNonFiniteResult = errors.New("result is not a finite number")
+
+func Add(a, b float64) (float64, error) {
+        <span class="cov8" title="1">return finite(a + b)
+</span>}
+
+func Subtract(a, b float64) (float64, error) {
+        <span class="cov8" title="1">return finite(a - b)
+</span>}
+
+func Multiply(a, b float64) (float64, error) {
+        <span class="cov8" title="1">return finite(a * b)
+</span>}
+
+func Divide(a, b float64) (float64, error) {
+        <span class="cov8" title="1">if b == 0 </span>{
+                <span class="cov8" title="1">return 0, ErrDivisionByZero
+</span>        }
+        <span class="cov8" title="1">return finite(a / b)</span>
+}
+
+func Power(base, exp float64) (float64, error) {
+        <span class="cov8" title="1">return finite(math.Pow(base, exp))
+</span>}
+
+func Sqrt(a float64) (float64, error) {
+        <span class="cov8" title="1">if a &lt; 0 </span>{
+                <span class="cov8" title="1">return 0, ErrNegativeSqrt
+</span>        }
+        <span class="cov8" title="1">return math.Sqrt(a), nil</span>
+}
+
+// Percentage returns pct percent of the given value, e.g. Percentage(20, 150) = 30.
+func Percentage(pct, of float64) (float64, error) {
+        <span class="cov8" title="1">return finite(pct * of / 100)
+</span>}
+
+// finite returns v unchanged, or ErrNonFiniteResult if v is Inf or NaN,
+// since those values cannot be represented in JSON.
+func finite(v float64) (float64, error) {
+        <span class="cov8" title="1">if math.IsInf(v, 0) || math.IsNaN(v) </span>{
+                <span class="cov8" title="1">return 0, ErrNonFiniteResult
+</span>        }
+        <span class="cov8" title="1">return v, nil</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>
