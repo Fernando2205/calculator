@@ -50,7 +50,7 @@ export default function App () {
               <Keypad activeOperator={state.op} onPress={press} />
             </div>
             <p className='m-0 text-[12px] leading-[1.7] text-mut pointer-coarse:hidden'>
-              0–9 · + − * / · ^ or p power · s sqrt · % percent · enter · esc
+              0–9 · + − * / · p power · s sqrt · % percent · enter · esc
             </p>
           </section>
 

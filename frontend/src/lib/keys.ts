@@ -21,8 +21,7 @@ const KEYBOARD: Record<string, KeyId> = {
   '*': 'multiply',
   x: 'multiply',
   '/': 'divide',
-  '^': 'power',
-  // "^" is a dead key on Spanish keyboard layouts (the browser reports "Dead").
+  // Not "^": it is a dead key on Spanish keyboard layouts (the browser reports "Dead").
   p: 'power',
   '%': 'percentage',
   s: 'sqrt',
