@@ -68,7 +68,12 @@ var operations = map[string]operation{
 func NewHandler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/v1/{operation}", handleCalculate)
+	mux.HandleFunc("GET /healthz", handleHealth)
 	return mux
+}
+
+func handleHealth(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func handleCalculate(w http.ResponseWriter, r *http.Request) {
