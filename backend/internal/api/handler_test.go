@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -100,6 +101,50 @@ func TestCalculateMethodNotAllowed(t *testing.T) {
 
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Errorf("status = %d, want %d", rec.Code, http.StatusMethodNotAllowed)
+	}
+}
+
+func TestCalculateDomainErrors(t *testing.T) {
+	tests := []struct {
+		name      string
+		operation string
+		body      string
+		wantCode  string
+	}{
+		{"division by zero", "divide", `{"a": 5, "b": 0}`, "DIVISION_BY_ZERO"},
+		{"square root of negative number", "sqrt", `{"a": -4}`, "NEGATIVE_SQRT"},
+		{"overflow", "multiply", `{"a": 1e308, "b": 10}`, "NON_FINITE_RESULT"},
+		{"zero to a negative power", "power", `{"a": 0, "b": -1}`, "NON_FINITE_RESULT"},
+	}
+
+	handler := NewHandler()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/"+tt.operation, strings.NewReader(tt.body))
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			assertError(t, rec, http.StatusUnprocessableEntity, tt.wantCode)
+		})
+	}
+}
+
+func TestCalculateUnexpectedError(t *testing.T) {
+	operations["failing"] = operation{apply: func(a, b float64) (float64, error) {
+		return 0, errors.New("unexpected failure")
+	}}
+	t.Cleanup(func() { delete(operations, "failing") })
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/failing", strings.NewReader(`{"a": 1, "b": 2}`))
+	rec := httptest.NewRecorder()
+
+	NewHandler().ServeHTTP(rec, req)
+
+	assertError(t, rec, http.StatusInternalServerError, "INTERNAL_ERROR")
+	if strings.Contains(rec.Body.String(), "unexpected failure") {
+		t.Error("response leaks internal error details")
 	}
 }
 
