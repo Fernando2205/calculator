@@ -1,6 +1,9 @@
 package calculator
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestAdd(t *testing.T) {
 	tests := []struct {
@@ -11,6 +14,7 @@ func TestAdd(t *testing.T) {
 		{"two positive numbers", 1, 2, 3},
 		{"two negative numbers", -2, -3, -5},
 		{"one positive and one negative number", 5, -3, 2},
+		{"two zeros", 0, 0, 0},
 		{"zero and a positive number", 0, 5, 5},
 		{"zero and a negative number", 0, -5, -5},
 		{"floating point numbers", 0.1, 0.2, 0.3},
@@ -21,10 +25,15 @@ func TestAdd(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
-			if got != tt.want {
+			if !almostEqual(got, tt.want) {
 				t.Errorf("Add(%v,%v)= %v, want %v", tt.a, tt.b, got, tt.want)
 			}
-
 		})
 	}
+}
+
+const epsilon = 1e-9
+
+func almostEqual(a, b float64) bool {
+	return math.Abs(a-b) < epsilon
 }
