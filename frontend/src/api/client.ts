@@ -11,6 +11,9 @@ const INVALID_RESPONSE = 'INVALID_RESPONSE'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'
 
+/** Host the calculator talks to, shown in the hero line. */
+export const API_HOST = API_URL ? new URL(API_URL).host : window.location.host
+
 /** Error returned by the API (or by the client when the request fails). */
 export class ApiError extends Error {
   readonly code: string
