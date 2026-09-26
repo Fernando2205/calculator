@@ -11,7 +11,7 @@ var ErrDivisionByZero = errors.New("division by zero")
 // ErrNegativeSqrt is returned when attempting to calculate the square root of a negative number.
 var ErrNegativeSqrt = errors.New("square root of negative number")
 
-// ErrNonFiniteResult is returned when an operation overflows or its result is undefined
+// ErrNonFiniteResult is returned when an operation overflows or its result is undefined.
 var ErrNonFiniteResult = errors.New("result is not a finite number")
 
 func Add(a, b float64) (float64, error) {
