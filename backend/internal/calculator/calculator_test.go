@@ -123,6 +123,92 @@ func TestDivide(t *testing.T) {
 	}
 }
 
+func TestPower(t *testing.T) {
+	tests := []struct {
+		name      string
+		base, exp float64
+		want      float64
+	}{
+		{"positive base and exponent", 2, 3, 8},
+		{"exponent zero", 5, 0, 1},
+		{"exponent one", 7, 1, 7},
+		{"negative base, even exponent", -2, 2, 4},
+		{"negative base, odd exponent", -2, 3, -8},
+		{"negative exponent", 2, -2, 0.25},
+		{"fractional exponent", 9, 0.5, 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Power(tt.base, tt.exp)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !almostEqual(got, tt.want) {
+				t.Errorf("Power(%v,%v)= %v, want %v", tt.base, tt.exp, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSqrt(t *testing.T) {
+	tests := []struct {
+		name    string
+		a       float64
+		want    float64
+		wantErr error
+	}{
+		{"perfect square", 16, 4, nil},
+		{"non-perfect square", 2, 1.4142135623, nil},
+		{"zero", 0, 0, nil},
+		{"decimal", 0.25, 0.5, nil},
+		{"negative number", -4, 0, ErrNegativeSqrt},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Sqrt(tt.a)
+			if tt.wantErr != nil {
+				if !errors.Is(err, tt.wantErr) {
+					t.Fatalf("Sqrt(%v) error = %v, want %v", tt.a, err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !almostEqual(got, tt.want) {
+				t.Errorf("Sqrt(%v)= %v, want %v", tt.a, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestPercentage(t *testing.T) {
+	tests := []struct {
+		name    string
+		pct, of float64
+		want    float64
+	}{
+		{"20 percent of 150", 20, 150, 30},
+		{"100 percent", 100, 80, 80},
+		{"zero percent", 0, 80, 0},
+		{"percent of zero", 50, 0, 0},
+		{"more than 100 percent", 150, 20, 30},
+		{"decimal percent", 12.5, 80, 10},
+		{"negative percent", -10, 50, -5},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Percentage(tt.pct, tt.of)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if !almostEqual(got, tt.want) {
+				t.Errorf("Percentage(%v,%v)= %v, want %v", tt.pct, tt.of, got, tt.want)
+			}
+		})
+	}
+}
+
 const epsilon = 1e-9
 
 func almostEqual(a, b float64) bool {
