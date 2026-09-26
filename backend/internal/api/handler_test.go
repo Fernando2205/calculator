@@ -147,6 +147,23 @@ func TestCalculateUnexpectedError(t *testing.T) {
 		t.Error("response leaks internal error details")
 	}
 }
+func TestHealth(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+
+	NewHandler().ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+	var resp map[string]string
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("invalid JSON response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf(`status field = %q, want "ok"`, resp["status"])
+	}
+}
 
 // assertError checks that the response is a JSON error with the given status and code.
 func assertError(t *testing.T, rec *httptest.ResponseRecorder, wantStatus int, wantCode string) {
