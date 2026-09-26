@@ -167,6 +167,11 @@ describe('sqrt', () => {
     expect(next).toMatchObject({ a: '5', op: 'add', b: '9', sqrt: true })
   })
 
+  it('keeps a single √ when pressed twice', () => {
+    const once = run(state({ a: '9' }), { type: 'sqrt' })
+    expect(run(once, { type: 'sqrt' })).toBe(once)
+  })
+
   it('marks a number that was already typed', () => {
     expect(run(state({ a: '9' }), { type: 'sqrt' })).toMatchObject({ a: '9', sqrt: true })
   })
