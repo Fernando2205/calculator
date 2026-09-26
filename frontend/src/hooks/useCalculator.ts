@@ -2,6 +2,7 @@ import { useReducer, useRef } from 'react'
 import { ApiError, type ApiStatus, type BinaryOperation, calculate, NETWORK_ERROR } from '../api/client'
 import { getDisplay } from '../calculator/display'
 import {
+  type Action,
   type CalcRequest,
   calculatorReducer,
   equalsRequest,
@@ -19,22 +20,42 @@ const isDigitKey = (key: KeyId): key is `d${Digit}` => /^d[0-9]$/.test(key)
  */
 export function useCalculator (onApiStatus?: (status: ApiStatus) => void) {
   const [state, dispatch] = useReducer(calculatorReducer, initialState)
+  // Mirror of the state that is updated synchronously, so a request can be
+  // planned right after the previous one finishes (e.g. "5 + √9 =" runs √9
+  // and then 5 + 3) without waiting for React to re-render.
+  const latest = useRef(state)
   // Guards against a second request before React re-renders with loading = true.
   const busy = useRef(false)
 
+  function apply (action: Action) {
+    latest.current = calculatorReducer(latest.current, action)
+    dispatch(action)
+  }
+
   async function run (request: CalcRequest): Promise<boolean> {
-    busy.current = true
-    dispatch({ type: 'requestStarted' })
+    apply({ type: 'requestStarted' })
     try {
       const result = await calculate(request.operation, request.a, request.b)
-      dispatch({ type: 'requestSucceeded', request, result: formatNumber(result) })
+      apply({ type: 'requestSucceeded', request, result: formatNumber(result) })
       onApiStatus?.('online')
       return true
     } catch (error) {
       const apiError = error instanceof ApiError ? error : new ApiError('UNKNOWN', 'unexpected error')
       onApiStatus?.(apiError.code === NETWORK_ERROR ? 'offline' : 'online')
-      dispatch({ type: 'requestFailed', request, message: apiError.message })
+      apply({ type: 'requestFailed', request, message: apiError.message })
       return false
+    }
+  }
+
+  /** Runs whatever is pending: first a √ on the current operand, then the binary operation. */
+  async function resolvePending (): Promise<boolean> {
+    busy.current = true
+    try {
+      const sqrt = sqrtRequest(latest.current)
+      if (sqrt && !(await run(sqrt))) return false
+      const pending = equalsRequest(latest.current)
+      if (pending && !(await run(pending))) return false
+      return true
     } finally {
       busy.current = false
     }
@@ -42,16 +63,14 @@ export function useCalculator (onApiStatus?: (status: ApiStatus) => void) {
 
   async function setOperator (op: BinaryOperation) {
     // "7 + 2 ×" first resolves "7 + 2" and then applies × to the result.
-    const pending = equalsRequest(state)
-    if (pending && !(await run(pending))) return
-    dispatch({ type: 'setOperator', op })
+    if (await resolvePending()) apply({ type: 'setOperator', op })
   }
 
   function press (key: KeyId) {
     if (busy.current) return
 
     if (isDigitKey(key)) {
-      dispatch({ type: 'digit', digit: key.slice(1) })
+      apply({ type: 'digit', digit: key.slice(1) })
       return
     }
 
@@ -60,18 +79,12 @@ export function useCalculator (onApiStatus?: (status: ApiStatus) => void) {
       case 'sign':
       case 'back':
       case 'clear':
-        dispatch({ type: key })
+      case 'sqrt':
+        apply({ type: key })
         break
-      case 'equals': {
-        const request = equalsRequest(state)
-        if (request) run(request)
+      case 'equals':
+        resolvePending()
         break
-      }
-      case 'sqrt': {
-        const request = sqrtRequest(state)
-        if (request) run(request)
-        break
-      }
       default:
         setOperator(key)
     }
@@ -79,7 +92,7 @@ export function useCalculator (onApiStatus?: (status: ApiStatus) => void) {
 
   function reuse (value: string) {
     if (busy.current) return
-    dispatch({ type: 'reuse', value })
+    apply({ type: 'reuse', value })
   }
 
   return { state, display: getDisplay(state), press, reuse }

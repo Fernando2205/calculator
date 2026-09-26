@@ -36,6 +36,8 @@ export interface CalculatorState {
   loading: boolean
   /** Whether "a" holds a result, so the next digit starts a new number. */
   fresh: boolean
+  /** Whether the current operand ("b" if an operator is pending, else "a") is under a pending √. */
+  sqrt: boolean
   history: HistoryEntry[]
 }
 
@@ -56,6 +58,7 @@ export type Action =
   | { type: 'back' }
   | { type: 'clear' }
   | { type: 'setOperator', op: BinaryOperation }
+  | { type: 'sqrt' }
   | { type: 'reuse', value: string }
   | { type: 'requestStarted' }
   | { type: 'requestSucceeded', request: CalcRequest, result: string }
@@ -70,6 +73,7 @@ export const initialState: CalculatorState = {
   error: null,
   loading: false,
   fresh: false,
+  sqrt: false,
   history: []
 }
 
@@ -81,7 +85,8 @@ const cleared = {
   result: null,
   expr: '',
   error: null,
-  fresh: false
+  fresh: false,
+  sqrt: false
 } satisfies Partial<CalculatorState>
 
 const current = (s: CalculatorState) => (s.op ? s.b : s.a)
@@ -125,18 +130,29 @@ export function calculatorReducer (s: CalculatorState, action: Action): Calculat
 
     case 'back': {
       if (s.error || s.fresh) return { ...s, ...cleared }
+      if (s.sqrt && current(s) === '') return { ...withCurrent(s, s.op ? '' : '0'), sqrt: false }
       if (s.op && s.b === '') return { ...s, op: null }
       const next = current(s).slice(0, -1)
       const emptied = next === '' || next === '-'
-      return withCurrent(s, emptied ? (s.op ? '' : '0') : next)
+      // An emptied operand stays blank after "√" or an operator, and goes back to 0 otherwise.
+      return withCurrent(s, emptied ? (s.op || s.sqrt ? '' : '0') : next)
     }
 
     case 'clear':
       return { ...s, ...cleared }
 
     case 'setOperator':
-      if (s.error) return s
+      // A pending √ is resolved by the hook before the operator is applied.
+      if (s.error || s.sqrt) return s
       return { ...s, op: action.op, b: '', fresh: false, result: null, expr: '' }
+
+    case 'sqrt': {
+      if (startsOver(s)) return { ...s, ...cleared, a: '', sqrt: true }
+      if (s.sqrt) return s
+      // √ applies to the number typed next; the untouched initial 0 is dropped.
+      const value = current(s)
+      return { ...withCurrent(s, !s.op && value === '0' ? '' : value), sqrt: true }
+    }
 
     case 'reuse':
       return { ...s, ...cleared, a: action.value }
@@ -147,7 +163,7 @@ export function calculatorReducer (s: CalculatorState, action: Action): Calculat
     case 'requestSucceeded': {
       const { request, result } = action
       const history = [...s.history, { expr: request.expr, result }]
-      if (request.target === 'b') return { ...s, b: result, loading: false, history }
+      if (request.target === 'b') return { ...s, b: result, sqrt: false, loading: false, history }
       return {
         ...s,
         a: result,
@@ -156,6 +172,7 @@ export function calculatorReducer (s: CalculatorState, action: Action): Calculat
         result,
         expr: request.expr,
         fresh: true,
+        sqrt: false,
         loading: false,
         history
       }
@@ -169,14 +186,18 @@ export function calculatorReducer (s: CalculatorState, action: Action): Calculat
         op: null,
         b: '',
         fresh: true,
+        sqrt: false,
         loading: false
       }
   }
 }
 
-/** Builds the request for "=", or null if the calculation is not ready. */
+/**
+ * Builds the request for the pending binary operation, or null if it is not
+ * ready. A pending √ on "b" has to be resolved first (see sqrtRequest).
+ */
 export function equalsRequest (s: CalculatorState): CalcRequest | null {
-  if (s.loading || !s.op || !isComplete(s.b)) return null
+  if (s.loading || s.sqrt || !s.op || !isComplete(s.b)) return null
   const a = parseFloat(s.a)
   const b = parseFloat(s.b)
   return {
@@ -188,10 +209,10 @@ export function equalsRequest (s: CalculatorState): CalcRequest | null {
   }
 }
 
-/** Builds the request for √ on the current operand, or null if it cannot run. */
+/** Builds the request for a pending √ on the current operand, or null if there is none to run. */
 export function sqrtRequest (s: CalculatorState): CalcRequest | null {
   const value = current(s)
-  if (s.loading || s.error || !isComplete(value)) return null
+  if (s.loading || !s.sqrt || !isComplete(value)) return null
   const a = parseFloat(value)
   return {
     operation: 'sqrt',

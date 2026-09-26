@@ -32,12 +32,17 @@ export function getDisplay (s: CalculatorState): DisplayModel {
   } else if (s.op) {
     model = {
       expression: `${s.a} ${SYMBOLS[s.op]}`,
-      value: s.b === '' ? s.a : s.b,
+      value: s.sqrt ? `${SYMBOLS.sqrt}${s.b}` : s.b === '' ? s.a : s.b,
       status: { tone: 'none', text: '' },
       isError: false
     }
   } else {
-    model = { expression: '', value: s.a, status: { tone: 'none', text: '' }, isError: false }
+    model = {
+      expression: '',
+      value: s.sqrt ? `${SYMBOLS.sqrt}${s.a}` : s.a,
+      status: { tone: 'none', text: '' },
+      isError: false
+    }
   }
 
   if (s.loading) model.status = { tone: 'muted', text: '~ $ computing…' }
